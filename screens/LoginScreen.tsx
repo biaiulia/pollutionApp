@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Alert } from 'react-native';
 import { TextInput, Button, Title } from 'react-native-paper';
+import { sanitizeInput } from '../sanitize'; 
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
+import { storeToken } from '../utils/tokenStorage';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import { API_BASE_URL } from '@env';
 
 type RootStackParamList = {
   Login: undefined;
@@ -21,8 +26,64 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    navigation.navigate('Map');
+  const registerForPushNotificationsAsync = async () => {
+    let token;
+    if (Constants.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        Alert.alert('Failed to get push token for push notification!');
+        return;
+      }
+      token = (await Notifications.getExpoPushTokenAsync()).data;
+    } else {
+      Alert.alert('Must use physical device for Push Notifications');
+    }
+    return token;
+  };
+
+  const handleLogin = async () => {
+    // Sanitize user inputs
+    const sanitizedUsername = sanitizeInput(username);
+    const sanitizedPassword = sanitizeInput(password);
+
+    // Perform login
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: sanitizedUsername.toLowerCase(), password: sanitizedPassword }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        await storeToken(data.access_token); // Store the token
+        const expoToken = await registerForPushNotificationsAsync();
+        
+        if (expoToken) {
+          await fetch(`${API_BASE_URL}/user/expo-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${data.access_token}`,
+            },
+            body: JSON.stringify({ token: expoToken }),
+          });
+        }
+
+        navigation.navigate('Map');
+      } else {
+        Alert.alert('Login failed', 'Invalid credentials');
+      }
+    } catch (error) {
+      Alert.alert('Login failed', 'An error occurred');
+    }
   };
 
   return (

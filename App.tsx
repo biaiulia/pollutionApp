@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider as PaperProvider } from 'react-native-paper';
@@ -7,15 +7,28 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import MapScreen from './screens/MapScreen';
 import LoginScreen from './screens/LoginScreen';
 import { TouchableOpacity, Alert } from 'react-native';
+import { getToken } from './utils/tokenStorage';
 
 const Stack = createStackNavigator();
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = await getToken();
+      if (token) {
+        setIsAuthenticated(true);
+      }
+    };
+    checkAuth();
+  }, []);
+
   return (
     <PaperProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Login"
+          initialRouteName={isAuthenticated ? 'Map' : 'Login'}
           screenOptions={({ navigation }) => ({
             headerRight: () => (
               <TouchableOpacity

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Dimensions, Text, Button, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Dimensions, Text, Button, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Helper function to calculate AQI based on PM2.5
 const calculateAQI = (pm25: number): { level: string; color: string } => {
@@ -15,69 +16,43 @@ const calculateAQI = (pm25: number): { level: string; color: string } => {
 const MapScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<{ id: string, text: string, read: boolean }[]>([]);
   const [subscribedSensors, setSubscribedSensors] = useState<string[]>([]);
+  const [markers, setMarkers] = useState<any[]>([]);
 
-  const markers = [
-    {
-      id: 'ii3254',
-      location: 'Calea Victoriei',
-      latitude: 44.433696,
-      longitude: 26.097924,
-      title: 'Airly Sensor 1',
-      data: {
-        temperature: 25,
-        humidity: 60,
-        pm25: 10, // Good
-        pm10: 20,
-        pm1: 5,
-      },
-    },
-    {
-      id: 'i97068',
-      location: 'Bulevardul Libertatii',
-      latitude: 44.425483,
-      longitude: 26.091003,
-      title: 'Airly Sensor 2',
-      data: {
-        temperature: 30,
-        humidity: 55,
-        pm25: 75, // Moderate
-        pm10: 25,
-        pm1: 8,
-      },
-    },
-    {
-      id: 'i115449',
-      location: 'Strada Mihail Sebastian',
-      latitude: 44.417647,
-      longitude: 26.071874,
-      title: 'Airly Sensor 3',
-      data: {
-        temperature: 35,
-        humidity: 65,
-        pm25: 160, // Unhealthy
-        pm10: 18,
-        pm1: 7,
-      },
-    },
-    {
-      id: 'i4456',
-      location: 'Piata Libertatii',
-      latitude: 44.418534,
-      longitude: 26.095916,
-      title: 'Edge Node',
-      data: {
-        temperature: 32,
-        humidity: 65,
-        pm25: 200, // Very Unhealthy
-        pm10: 18,
-        pm1: 7,
-      },
-    },
-  ];
+  useEffect(() => {
+    fetchSensors();
+  }, []);
 
-  const handleSubscribe = (sensorId: string, aqiLevel: string) => {
-    setSubscribedSensors([...subscribedSensors, sensorId]);
-    setNotifications([...notifications, { id: sensorId, text: `Subscribed to sensor ${sensorId} with AQI level: ${aqiLevel}`, read: false }]);
+  const fetchSensors = async () => {
+    try {
+      const response = await fetch('http://localhost:3010/api/sensor-readings');
+      const data = await response.json();
+      setMarkers(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch sensor data');
+    }
+  };
+
+  const handleSubscribe = async (sensorId: string, aqiLevel: string) => {
+    const token = await AsyncStorage.getItem('access_token');
+    if (!token) {
+      Alert.alert('Error', 'No access token found');
+      return;
+    }
+
+    try {
+      await fetch('http://localhost:3010/api/subscription/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sensorId }),
+      });
+      setSubscribedSensors([...subscribedSensors, sensorId]);
+      setNotifications([...notifications, { id: sensorId, text: `Subscribed to sensor ${sensorId} with AQI level: ${aqiLevel}`, read: false }]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to subscribe to sensor');
+    }
   };
 
   const markAsRead = (notificationId: string) => {
@@ -96,7 +71,7 @@ const MapScreen: React.FC = () => {
         }}
       >
         {markers.map(marker => {
-          const { level, color } = calculateAQI(marker.data.pm25);
+          const { level, color } = calculateAQI(marker.pm25);
           return (
             <Marker
               key={marker.id}
@@ -117,11 +92,11 @@ const MapScreen: React.FC = () => {
                     />
                   </View>
                   <View style={styles.calloutRight}>
-                    <Text>Temperature: {marker.data.temperature}°C</Text>
-                    <Text>Humidity: {marker.data.humidity}%</Text>
-                    <Text>PM2.5: {marker.data.pm25}</Text>
-                    <Text>PM10: {marker.data.pm10}</Text>
-                    <Text>PM1: {marker.data.pm1}</Text>
+                    <Text>Temperature: {marker.temperature}°C</Text>
+                    <Text>Humidity: {marker.humidity}%</Text>
+                    <Text>PM2.5: {marker.pm25}</Text>
+                    <Text>PM10: {marker.pm10}</Text>
+                    <Text>PM1: {marker.pm1}</Text>
                   </View>
                 </View>
               </Callout>
@@ -139,7 +114,7 @@ const MapScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+               </ScrollView>
       </View>
     </View>
   );
@@ -199,3 +174,4 @@ const styles = StyleSheet.create({
 });
 
 export default MapScreen;
+
