@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Alert } from 'react-native';
 import { TextInput, Button, Title } from 'react-native-paper';
-import { sanitizeInput } from '../sanitize'; 
+import { sanitizeInput } from '../sanitize';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { storeToken } from '../utils/tokenStorage';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { API_BASE_URL } from '@env';
 
 type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
   Map: undefined;
+  VerifyEmail: { token: string };
 };
 
 type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Login'>;
@@ -39,7 +40,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         Alert.alert('Failed to get push token for push notification!');
         return;
       }
-      token = (await Notifications.getExpoPushTokenAsync()).data;
+      token = (await Notifications.getExpoPushTokenAsync({
+        projectId: 'your-project-id',  // Add your project ID here
+      })).data;
     } else {
       Alert.alert('Must use physical device for Push Notifications');
     }
@@ -48,26 +51,31 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleLogin = async () => {
     // Sanitize user inputs
-    const sanitizedUsername = sanitizeInput(username);
+    const sanitizedUsername = sanitizeInput(username).toLowerCase();
     const sanitizedPassword = sanitizeInput(password);
 
+  
     // Perform login
     try {
-      const response = await fetch(`${API_BASE_URL}/user/login`, {
+
+      const response = await fetch(`http://192.168.0.100:3010/user/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: sanitizedUsername.toLowerCase(), password: sanitizedPassword }),
+        body: JSON.stringify({ email: sanitizedUsername, password: sanitizedPassword }),
       });
+  
 
+  
       if (response.ok) {
         const data = await response.json();
+
         await storeToken(data.access_token); // Store the token
         const expoToken = await registerForPushNotificationsAsync();
-        
+  
         if (expoToken) {
-          await fetch(`${API_BASE_URL}/user/expo-token`, {
+          await fetch(`http://192.168.0.100:3010/user/expo-token`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -76,15 +84,19 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
             body: JSON.stringify({ token: expoToken }),
           });
         }
-
+  
         navigation.navigate('Map');
       } else {
-        Alert.alert('Login failed', 'Invalid credentials');
+        const errorData = await response.json();
+
+        Alert.alert('Login failed', errorData.message || 'Invalid credentials');
       }
     } catch (error) {
-      Alert.alert('Login failed', 'An error occurred');
+      console.error('Login failed:', error);
+      Alert.alert('Login failed', error.message || 'An error occurred');
     }
   };
+  
 
   return (
     <View style={styles.container}>
@@ -105,6 +117,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       <Button mode="contained" onPress={handleLogin} style={styles.button}>
         Login
       </Button>
+      <Button mode="text" onPress={() => navigation.navigate('Register')} style={styles.registerButton}>
+        Don't have an account? Register
+      </Button>
     </View>
   );
 };
@@ -124,6 +139,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
+    marginTop: 16,
+  },
+  registerButton: {
     marginTop: 16,
   },
 });

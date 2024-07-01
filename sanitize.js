@@ -1,5 +1,4 @@
-export function sanitizeInput(input) {
-    const sanitized = input.replace(/[<>]/g, '');
-    return sanitized.trim();
-  }
+export const sanitizeInput = (input) => {
+    return input.replace(/[^a-zA-Z0-9@.]/g, '');
+  };
   

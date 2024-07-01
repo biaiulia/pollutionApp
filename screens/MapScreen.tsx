@@ -2,33 +2,77 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Dimensions, Text, Button, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import apiFetch from '../utils/apiFetch';
 
-// Helper function to calculate AQI based on PM2.5
-const calculateAQI = (pm25: number): { level: string; color: string } => {
-  if (pm25 <= 50) return { level: 'Good', color: 'green' };
-  if (pm25 <= 100) return { level: 'Moderate', color: 'yellow' };
-  if (pm25 <= 150) return { level: 'Unhealthy for Sensitive Groups', color: 'orange' };
-  if (pm25 <= 200) return { level: 'Unhealthy', color: 'red' };
-  if (pm25 <= 300) return { level: 'Very Unhealthy', color: 'purple' };
-  return { level: 'Hazardous', color: 'maroon' };
-};
+interface SensorDetails {
+  temperature: number;
+  humidity: number;
+  PM25: number;
+  PM1: number;
+  PM10: number;
+  aqiLevel: string;
+  aqiColor: string;
+}
 
 const MapScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<{ id: string, text: string, read: boolean }[]>([]);
   const [subscribedSensors, setSubscribedSensors] = useState<string[]>([]);
   const [markers, setMarkers] = useState<any[]>([]);
+  const [selectedMarkerDetails, setSelectedMarkerDetails] = useState<SensorDetails | null>(null);
 
   useEffect(() => {
     fetchSensors();
+    fetchSubscribedSensors();
   }, []);
 
   const fetchSensors = async () => {
     try {
-      const response = await fetch('http://localhost:3010/api/sensor-readings');
+      const response = await apiFetch(`http://192.168.0.100:3010/sensors`);
       const data = await response.json();
-      setMarkers(data);
+
+      if (Array.isArray(data)) {
+        setMarkers(data);
+      } else {
+        console.error('Data is not an array:', data);
+        setMarkers([]);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch sensor data');
+      setMarkers([]);
+    }
+  };
+
+  const fetchSubscribedSensors = async () => {
+    const token = await AsyncStorage.getItem('access_token');
+    if (!token) {
+      return;
+    }
+    try {
+      const response = await apiFetch(`http://192.168.0.100:3010/subscription/subscribed-sensors`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      setSubscribedSensors(data.map((subscription: any) => subscription.sensorId));
+    } catch (error) {
+      console.error('Error fetching subscribed sensors:', error);
+    }
+  };
+
+  const fetchSensorDetails = async (sensorId: string) => {
+
+    try {
+      const response = await apiFetch(`http://192.168.0.100:3010/sensor-readings/${sensorId}/latest-reading`);
+      const data = await response.json();
+
+      setSelectedMarkerDetails(data);
+    } catch (error) {
+
+      Alert.alert('Error', 'Failed to fetch sensor details');
+      setSelectedMarkerDetails(null);
     }
   };
 
@@ -40,24 +84,56 @@ const MapScreen: React.FC = () => {
     }
 
     try {
-      await fetch('http://localhost:3010/api/subscription/subscribe', {
+      const response = await apiFetch(`http://192.168.0.100:3010/subscription/subscribe/${sensorId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ sensorId }),
       });
-      setSubscribedSensors([...subscribedSensors, sensorId]);
-      setNotifications([...notifications, { id: sensorId, text: `Subscribed to sensor ${sensorId} with AQI level: ${aqiLevel}`, read: false }]);
+
+      if (response.ok) {
+        setSubscribedSensors([...subscribedSensors, sensorId]);
+        setNotifications([...notifications, { id: sensorId, text: `Subscribed to sensor ${sensorId} with AQI level: ${aqiLevel}`, read: false }]);
+      } else {
+        Alert.alert('Error', 'Failed to subscribe to sensor');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to subscribe to sensor');
+    }
+  };
+
+  const handleUnsubscribe = async (sensorId: string) => {
+    const token = await AsyncStorage.getItem('access_token');
+    if (!token) {
+      Alert.alert('Error', 'No access token found');
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`http://192.168.0.100:3010/subscription/unsubscribe/${sensorId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setSubscribedSensors(subscribedSensors.filter((id) => id !== sensorId));
+        setNotifications([...notifications, { id: sensorId, text: `Unsubscribed from sensor ${sensorId}`, read: false }]);
+      } else {
+        Alert.alert('Error', 'Failed to unsubscribe from sensor');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to unsubscribe from sensor');
     }
   };
 
   const markAsRead = (notificationId: string) => {
     setNotifications(notifications.map(notification => notification.id === notificationId ? { ...notification, read: true } : notification));
   };
+
+  const isSubscribed = (sensorId: string) => subscribedSensors.includes(sensorId);
 
   return (
     <View style={styles.container}>
@@ -70,39 +146,39 @@ const MapScreen: React.FC = () => {
           longitudeDelta: 0.005,
         }}
       >
-        {markers.map(marker => {
-          const { level, color } = calculateAQI(marker.pm25);
-          return (
-            <Marker
-              key={marker.id}
-              coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
-              title={marker.title}
-              pinColor={color}
-            >
-              <Callout>
-                <View style={styles.callout}>
-                  <View style={styles.calloutLeft}>
-                    <Text style={styles.calloutTitle}>{marker.title}</Text>
-                    <Text style={styles.calloutSubtitle}>Location: {marker.location}</Text>
-                    <Text style={[styles.calloutSubtitle, { color }]}>AQI: {level}</Text>
-                    <Button
-                      title="Subscribe"
-                      onPress={() => handleSubscribe(marker.id, level)}
-                      color="#007BFF"
-                    />
-                  </View>
-                  <View style={styles.calloutRight}>
-                    <Text>Temperature: {marker.temperature}°C</Text>
-                    <Text>Humidity: {marker.humidity}%</Text>
-                    <Text>PM2.5: {marker.pm25}</Text>
-                    <Text>PM10: {marker.pm10}</Text>
-                    <Text>PM1: {marker.pm1}</Text>
-                  </View>
+        {markers.map(marker => (
+          <Marker
+            key={marker.id}
+            coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
+            title={marker.title}
+            pinColor={marker.aqiColor}
+            onPress={() => fetchSensorDetails(marker.id)}
+          >
+            <Callout>
+              <View style={styles.callout}>
+                <View style={styles.calloutLeft}>
+                  <Text style={styles.calloutTitle}>{marker.title}</Text>
+                  <Text style={styles.calloutSubtitle}>Location: {marker.location}</Text>
+                  <Text style={[styles.calloutSubtitle, { color: marker.aqiColor }]}>AQI: {marker.aqiLevel}</Text>
+                  <Button
+                    title={isSubscribed(marker.id) ? "Unsubscribe" : "Subscribe"}
+                    onPress={() => isSubscribed(marker.id) ? handleUnsubscribe(marker.id) : handleSubscribe(marker.id, marker.aqiLevel)}
+                    color="#007BFF"
+                  />
                 </View>
-              </Callout>
-            </Marker>
-          );
-        })}
+                {selectedMarkerDetails && (
+                  <View style={styles.calloutRight}>
+                    <Text>Temperature: {selectedMarkerDetails.temperature}°C</Text>
+                    <Text>Humidity: {selectedMarkerDetails.humidity}%</Text>
+                    <Text>PM2.5: {selectedMarkerDetails.PM25}</Text>
+                    <Text>PM10: {selectedMarkerDetails.PM10}</Text>
+                    <Text>PM1: {selectedMarkerDetails.PM1}</Text>
+                  </View>
+                )}
+              </View>
+            </Callout>
+          </Marker>
+        ))}
       </MapView>
       <View style={styles.notificationsContainer}>
         <Text style={styles.notificationsTitle}>Notifications</Text>
@@ -114,7 +190,7 @@ const MapScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))}
-               </ScrollView>
+        </ScrollView>
       </View>
     </View>
   );
@@ -129,15 +205,16 @@ const styles = StyleSheet.create({
     height: Dimensions.get('window').height - 200,
   },
   callout: {
+    width: 330,
     flexDirection: 'row',
     padding: 10,
   },
   calloutLeft: {
-    flex: 1,
+    width: 150,
     marginRight: 10,
   },
   calloutRight: {
-    flex: 1,
+    width: 180,
   },
   calloutTitle: {
     fontWeight: 'bold',
@@ -174,4 +251,3 @@ const styles = StyleSheet.create({
 });
 
 export default MapScreen;
-
