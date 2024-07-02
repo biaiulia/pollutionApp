@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Dimensions, Text, Button, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, Button, TouchableOpacity, Alert } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
 import apiFetch from '../utils/apiFetch';
+import { getToken } from '../utils/tokenStorage';
 
 interface SensorDetails {
-  temperature: number;
-  humidity: number;
-  PM25: number;
-  PM1: number;
-  PM10: number;
-  aqiLevel: string;
-  aqiColor: string;
+  temperature?: number;
+  humidity?: number;
+  PM25?: number;
+  PM1?: number;
+  PM10?: number;
+  aqiLevel?: string;
+  aqiColor?: string;
 }
 
 const MapScreen: React.FC = () => {
-  const [notifications, setNotifications] = useState<{ id: string, text: string, read: boolean }[]>([]);
   const [subscribedSensors, setSubscribedSensors] = useState<string[]>([]);
   const [markers, setMarkers] = useState<any[]>([]);
   const [selectedMarkerDetails, setSelectedMarkerDetails] = useState<SensorDetails | null>(null);
@@ -44,7 +42,7 @@ const MapScreen: React.FC = () => {
   };
 
   const fetchSubscribedSensors = async () => {
-    const token = await AsyncStorage.getItem('access_token');
+    const token = await getToken()
     if (!token) {
       return;
     }
@@ -63,21 +61,19 @@ const MapScreen: React.FC = () => {
   };
 
   const fetchSensorDetails = async (sensorId: string) => {
-
     try {
       const response = await apiFetch(`http://192.168.0.100:3010/sensor-readings/${sensorId}/latest-reading`);
       const data = await response.json();
 
       setSelectedMarkerDetails(data);
     } catch (error) {
-
       Alert.alert('Error', 'Failed to fetch sensor details');
       setSelectedMarkerDetails(null);
     }
   };
 
   const handleSubscribe = async (sensorId: string, aqiLevel: string) => {
-    const token = await AsyncStorage.getItem('access_token');
+    const token = await getToken()
     if (!token) {
       Alert.alert('Error', 'No access token found');
       return;
@@ -94,7 +90,7 @@ const MapScreen: React.FC = () => {
 
       if (response.ok) {
         setSubscribedSensors([...subscribedSensors, sensorId]);
-        setNotifications([...notifications, { id: sensorId, text: `Subscribed to sensor ${sensorId} with AQI level: ${aqiLevel}`, read: false }]);
+        Alert.alert('Subscribed', `Subscribed to sensor ${sensorId} with AQI level: ${aqiLevel}`);
       } else {
         Alert.alert('Error', 'Failed to subscribe to sensor');
       }
@@ -104,7 +100,7 @@ const MapScreen: React.FC = () => {
   };
 
   const handleUnsubscribe = async (sensorId: string) => {
-    const token = await AsyncStorage.getItem('access_token');
+    const token = await getToken()
     if (!token) {
       Alert.alert('Error', 'No access token found');
       return;
@@ -120,17 +116,13 @@ const MapScreen: React.FC = () => {
 
       if (response.ok) {
         setSubscribedSensors(subscribedSensors.filter((id) => id !== sensorId));
-        setNotifications([...notifications, { id: sensorId, text: `Unsubscribed from sensor ${sensorId}`, read: false }]);
+        Alert.alert('Unsubscribed', `Unsubscribed from sensor ${sensorId}`);
       } else {
         Alert.alert('Error', 'Failed to unsubscribe from sensor');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to unsubscribe from sensor');
     }
-  };
-
-  const markAsRead = (notificationId: string) => {
-    setNotifications(notifications.map(notification => notification.id === notificationId ? { ...notification, read: true } : notification));
   };
 
   const isSubscribed = (sensorId: string) => subscribedSensors.includes(sensorId);
@@ -168,11 +160,11 @@ const MapScreen: React.FC = () => {
                 </View>
                 {selectedMarkerDetails && (
                   <View style={styles.calloutRight}>
-                    <Text>Temperature: {selectedMarkerDetails.temperature}°C</Text>
-                    <Text>Humidity: {selectedMarkerDetails.humidity}%</Text>
-                    <Text>PM2.5: {selectedMarkerDetails.PM25}</Text>
-                    <Text>PM10: {selectedMarkerDetails.PM10}</Text>
-                    <Text>PM1: {selectedMarkerDetails.PM1}</Text>
+                    {selectedMarkerDetails.temperature !== undefined && <Text>Temperature: {selectedMarkerDetails.temperature}°C</Text>}
+                    {selectedMarkerDetails.humidity !== undefined && <Text>Humidity: {selectedMarkerDetails.humidity}%</Text>}
+                    {selectedMarkerDetails.PM25 !== undefined && <Text>PM2.5: {selectedMarkerDetails.PM25}</Text>}
+                    {selectedMarkerDetails.PM10 !== undefined && <Text>PM10: {selectedMarkerDetails.PM10}</Text>}
+                    {selectedMarkerDetails.PM1 !== undefined && <Text>PM1: {selectedMarkerDetails.PM1}</Text>}
                   </View>
                 )}
               </View>
@@ -180,18 +172,6 @@ const MapScreen: React.FC = () => {
           </Marker>
         ))}
       </MapView>
-      <View style={styles.notificationsContainer}>
-        <Text style={styles.notificationsTitle}>Notifications</Text>
-        <ScrollView>
-          {notifications.map(notification => (
-            <TouchableOpacity key={notification.id} onPress={() => markAsRead(notification.id)}>
-              <View style={[styles.notification, notification.read ? styles.notificationRead : styles.notificationUnread]}>
-                <Text>{notification.text}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
     </View>
   );
 };
@@ -202,7 +182,7 @@ const styles = StyleSheet.create({
   },
   map: {
     width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height - 200,
+    height: Dimensions.get('window').height,
   },
   callout: {
     width: 330,
@@ -224,29 +204,6 @@ const styles = StyleSheet.create({
   calloutSubtitle: {
     fontSize: 14,
     marginBottom: 3,
-  },
-  notificationsContainer: {
-    padding: 10,
-    backgroundColor: '#f7f7f7',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    height: 200,
-  },
-  notificationsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  notification: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-  },
-  notificationRead: {
-    backgroundColor: '#e0e0e0',
-  },
-  notificationUnread: {
-    backgroundColor: '#ffffff',
   },
 });
 

@@ -8,8 +8,10 @@ import MapScreen from './screens/MapScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import VerifyEmailScreen from './screens/VerifyEmailScreen';
+import ConfirmationScreen from './screens/ConfirmationScreen';
 import { TouchableOpacity, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { getToken } from './utils/tokenStorage';
 
 const Stack = createStackNavigator();
 
@@ -18,7 +20,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('access_token');
+      const token = await getToken()
       if (token) {
         setIsAuthenticated(true);
       }
@@ -46,6 +48,7 @@ const App: React.FC = () => {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+          <Stack.Screen name="Confirmation" component={ConfirmationScreen} />
           <Stack.Screen name="Map" component={MapScreen} />
         </Stack.Navigator>
       </NavigationContainer>
