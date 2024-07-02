@@ -13,7 +13,7 @@ const VerifyEmailScreen: React.FC = () => {
     if (token) {
       const verifyEmail = async () => {
         try {
-          const response = await fetch(`http://192.168.0.100:3010/user/verify-email?token=${token}`, {
+          const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/users/verify-email?token=${token}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import apiFetch from '../utils/apiFetch';
 import { getToken } from '../utils/tokenStorage';
 
 interface Notification {
   id: string;
+  userId: string;
   message: string;
-  dateTime: string;
+  dateTime: Date;
   isRead: boolean;
 }
 
@@ -18,43 +19,52 @@ const NotificationsScreen: React.FC = () => {
   }, []);
 
   const fetchNotifications = async () => {
-    const token = await getToken();
+    const token = await getToken()
     if (!token) {
+      Alert.alert('Error', 'No access token found');
       return;
     }
+
     try {
-      const response = await apiFetch(`http://192.168.0.100:3010/notifications`, {
+      const response = await apiFetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/notifications`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setNotifications(data);
+console.log(response)
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setNotifications(data);
+        } else {
+          Alert.alert('No new notifications');
+        }
       } else {
-        setNotifications([]);
+        Alert.alert('Error', 'Failed to fetch notifications');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch notifications');
-      setNotifications([]);
     }
   };
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollView}>
-        {notifications.length === 0 ? (
-          <Text style={styles.noNotificationsText}>No new notifications</Text>
-        ) : (
-          notifications.map(notification => (
-            <View key={notification.id} style={styles.notificationContainer}>
+      <Text style={styles.header}>Notifications</Text>
+      {notifications.length === 0 ? (
+        <Text style={styles.noNotificationsText}>You have no new notifications</Text>
+      ) : (
+        <ScrollView>
+          {notifications.map((notification) => (
+            <View key={notification.id} style={styles.notification}>
               <Text style={styles.notificationMessage}>{notification.message}</Text>
-              <Text style={styles.notificationDate}>{new Date(notification.dateTime).toLocaleString()}</Text>
+              <Text style={styles.notificationDate}>
+                {new Date(notification.dateTime).toLocaleString()}
+              </Text>
             </View>
-          ))
-        )}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -62,34 +72,31 @@ const NotificationsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 10,
+    padding: 20,
     backgroundColor: '#fff',
   },
-  scrollView: {
-    flexGrow: 1,
-    justifyContent: 'center',
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
   noNotificationsText: {
     textAlign: 'center',
-    marginTop: 20,
-    fontSize: 16,
-    color: '#888',
+    fontSize: 18,
+    color: '#777',
   },
-  notificationContainer: {
-    marginBottom: 10,
-    padding: 10,
-    backgroundColor: '#f7f7f7',
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
+  notification: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
   notificationMessage: {
-    fontSize: 14,
-    marginBottom: 5,
+    fontSize: 16,
   },
   notificationDate: {
     fontSize: 12,
-    color: '#666',
+    color: '#888',
+    marginTop: 5,
   },
 });
 

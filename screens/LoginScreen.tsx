@@ -24,9 +24,10 @@ type Props = {
 };
 
 const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // TODO: See with notifications
   const registerForPushNotificationsAsync = async () => {
     let token;
     if (Constants.isDevice) {
@@ -44,26 +45,26 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         projectId: 'your-project-id',  // Add your project ID here
       })).data;
     } else {
-      Alert.alert('Must use physical device for Push Notifications');
+     // Alert.alert('Must use physical device for Push Notifications');
     }
     return token;
   };
 
   const handleLogin = async () => {
     // Sanitize user inputs
-    const sanitizedUsername = sanitizeInput(username).toLowerCase();
+    const sanitizedEmail = sanitizeInput(email).toLowerCase();
     const sanitizedPassword = sanitizeInput(password);
 
   
     // Perform login
     try {
-
-      const response = await fetch(`http://192.168.0.100:3010/user/login`, {
+console.log(process.env.EXPO_PUBLIC_API_BASE_URL)
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: sanitizedUsername, password: sanitizedPassword }),
+        body: JSON.stringify({ email: sanitizedEmail, password: sanitizedPassword }),
       });
   
 
@@ -75,7 +76,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         const expoToken = await registerForPushNotificationsAsync();
   
         if (expoToken) {
-          await fetch(`http://192.168.0.100:3010/user/expo-token`, {
+          await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/users/expo-token`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -102,9 +103,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <Title style={styles.title}>Login</Title>
       <TextInput
-        label="Username"
-        value={username}
-        onChangeText={setUsername}
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
         style={styles.input}
       />
       <TextInput

@@ -19,22 +19,20 @@ type Props = {
 };
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleRegister = async () => {
-    const sanitizedUsername = sanitizeInput(username);
     const sanitizedEmail = sanitizeInput(email);
     const sanitizedPassword = sanitizeInput(password);
 
     try {
-      const response = await fetch(`http://192.168.0.100:3010/user/register`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username: sanitizedUsername, email: sanitizedEmail, password: sanitizedPassword }),
+        body: JSON.stringify({ email: sanitizedEmail, password: sanitizedPassword }),
       });
 
       if (response.ok) {
@@ -52,9 +50,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <Title style={styles.title}>Register</Title>
       <TextInput
-        label="Username"
-        value={username}
-        onChangeText={setUsername}
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
         style={styles.input}
       />
       <TextInput

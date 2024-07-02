@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Dimensions, Text, Button, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import apiFetch from '../utils/apiFetch';
 import { getToken } from '../utils/tokenStorage';
@@ -26,7 +26,7 @@ const MapScreen: React.FC = () => {
 
   const fetchSensors = async () => {
     try {
-      const response = await apiFetch(`http://192.168.0.100:3010/sensors`);
+      const response = await apiFetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/sensors`);
       const data = await response.json();
 
       if (Array.isArray(data)) {
@@ -42,12 +42,12 @@ const MapScreen: React.FC = () => {
   };
 
   const fetchSubscribedSensors = async () => {
-    const token = await getToken()
+    const token = await getToken();
     if (!token) {
       return;
     }
     try {
-      const response = await apiFetch(`http://192.168.0.100:3010/subscription/subscribed-sensors`, {
+      const response = await apiFetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/subscriptions/subscribed-sensors`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -62,9 +62,8 @@ const MapScreen: React.FC = () => {
 
   const fetchSensorDetails = async (sensorId: string) => {
     try {
-      const response = await apiFetch(`http://192.168.0.100:3010/sensor-readings/${sensorId}/latest-reading`);
+      const response = await apiFetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/sensor-readings/${sensorId}/latest-reading`);
       const data = await response.json();
-
       setSelectedMarkerDetails(data);
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch sensor details');
@@ -73,14 +72,14 @@ const MapScreen: React.FC = () => {
   };
 
   const handleSubscribe = async (sensorId: string, aqiLevel: string) => {
-    const token = await getToken()
+    const token = await getToken();
     if (!token) {
       Alert.alert('Error', 'No access token found');
       return;
     }
 
     try {
-      const response = await apiFetch(`http://192.168.0.100:3010/subscription/subscribe/${sensorId}`, {
+      const response = await apiFetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/subscriptions/subscribe/${sensorId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -90,7 +89,6 @@ const MapScreen: React.FC = () => {
 
       if (response.ok) {
         setSubscribedSensors([...subscribedSensors, sensorId]);
-        Alert.alert('Subscribed', `Subscribed to sensor ${sensorId} with AQI level: ${aqiLevel}`);
       } else {
         Alert.alert('Error', 'Failed to subscribe to sensor');
       }
@@ -100,14 +98,14 @@ const MapScreen: React.FC = () => {
   };
 
   const handleUnsubscribe = async (sensorId: string) => {
-    const token = await getToken()
+    const token = await getToken();
     if (!token) {
       Alert.alert('Error', 'No access token found');
       return;
     }
 
     try {
-      const response = await apiFetch(`http://192.168.0.100:3010/subscription/unsubscribe/${sensorId}`, {
+      const response = await apiFetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/subscriptions/unsubscribe/${sensorId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -116,7 +114,6 @@ const MapScreen: React.FC = () => {
 
       if (response.ok) {
         setSubscribedSensors(subscribedSensors.filter((id) => id !== sensorId));
-        Alert.alert('Unsubscribed', `Unsubscribed from sensor ${sensorId}`);
       } else {
         Alert.alert('Error', 'Failed to unsubscribe from sensor');
       }
@@ -152,12 +149,15 @@ const MapScreen: React.FC = () => {
                   <Text style={styles.calloutTitle}>{marker.title}</Text>
                   <Text style={styles.calloutSubtitle}>Location: {marker.location}</Text>
                   <Text style={[styles.calloutSubtitle, { color: marker.aqiColor }]}>AQI: {marker.aqiLevel}</Text>
-                  <Button
-                    title={isSubscribed(marker.id) ? "Unsubscribe" : "Subscribe"}
+                  <TouchableOpacity
                     onPress={() => isSubscribed(marker.id) ? handleUnsubscribe(marker.id) : handleSubscribe(marker.id, marker.aqiLevel)}
-                    color="#007BFF"
-                  />
-                </View>
+                    style={styles.subscribeButton}
+                  >
+                    <Text style={styles.subscribeButtonText}>
+                      {isSubscribed(marker.id) ? "Unsubscribe" : "Subscribe"}
+                    </Text>
+                  </TouchableOpacity>
+                  </View>
                 {selectedMarkerDetails && (
                   <View style={styles.calloutRight}>
                     {selectedMarkerDetails.temperature !== undefined && <Text>Temperature: {selectedMarkerDetails.temperature}°C</Text>}
@@ -204,6 +204,16 @@ const styles = StyleSheet.create({
   calloutSubtitle: {
     fontSize: 14,
     marginBottom: 3,
+  },
+  subscribeButton: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 5,
+  },
+  subscribeButtonText: {
+    color: 'white',
+    textAlign: 'center',
   },
 });
 
