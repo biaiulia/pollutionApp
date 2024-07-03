@@ -12,6 +12,7 @@ interface SensorDetails {
   PM10?: number;
   aqiLevel?: string;
   aqiColor?: string;
+  dateTime?: Date
 }
 
 const MapScreen: React.FC = () => {
@@ -64,12 +65,20 @@ const MapScreen: React.FC = () => {
     try {
       const response = await apiFetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/sensor-readings/${sensorId}/latest-reading`);
       const data = await response.json();
-      setSelectedMarkerDetails(data);
+      if (data) {
+        setSelectedMarkerDetails({
+          ...data,
+          dateTime: new Date(data.dateTime).toLocaleDateString("en-GB")
+        });
+      } else {
+        setSelectedMarkerDetails(null);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch sensor details');
       setSelectedMarkerDetails(null);
     }
   };
+  
 
   const handleSubscribe = async (sensorId: string, aqiLevel: string) => {
     const token = await getToken();
@@ -158,7 +167,17 @@ const MapScreen: React.FC = () => {
                     </Text>
                   </TouchableOpacity>
                   </View>
-                {selectedMarkerDetails && (
+                  <View style={styles.calloutRight}>
+  {selectedMarkerDetails?.temperature !== undefined ? <Text>Temperature: {selectedMarkerDetails.temperature}°C</Text>: null}
+  {selectedMarkerDetails?.humidity !== undefined ? <Text>Humidity: {selectedMarkerDetails.humidity}%</Text>:null}
+  {selectedMarkerDetails?.PM25 !== undefined ? <Text>PM2.5: {selectedMarkerDetails.PM25}</Text>:null}
+  {selectedMarkerDetails?.PM10 !== undefined ?<Text>PM10: {selectedMarkerDetails.PM10}</Text>:null}
+  {selectedMarkerDetails?.PM1 !== undefined ? <Text>PM1: {selectedMarkerDetails.PM1}</Text>:null}
+  {selectedMarkerDetails?.dateTime ? <Text>Date Read: {selectedMarkerDetails.dateTime}</Text>:null}
+</View>
+
+                  
+                {/* {selectedMarkerDetails && (
                   <View style={styles.calloutRight}>
                     {selectedMarkerDetails.temperature !== undefined && <Text>Temperature: {selectedMarkerDetails.temperature}°C</Text>}
                     {selectedMarkerDetails.humidity !== undefined && <Text>Humidity: {selectedMarkerDetails.humidity}%</Text>}
@@ -166,7 +185,8 @@ const MapScreen: React.FC = () => {
                     {selectedMarkerDetails.PM10 !== undefined && <Text>PM10: {selectedMarkerDetails.PM10}</Text>}
                     {selectedMarkerDetails.PM1 !== undefined && <Text>PM1: {selectedMarkerDetails.PM1}</Text>}
                   </View>
-                )}
+                )} */}
+
               </View>
             </Callout>
           </Marker>

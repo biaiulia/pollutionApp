@@ -30,7 +30,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "pollution-app"  // Replace with your actual project ID
+        "projectId": "pollution-app"  
       }
     }
   }

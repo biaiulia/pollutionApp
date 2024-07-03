@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import apiFetch from '../utils/apiFetch';
 import { getToken } from '../utils/tokenStorage';
+import { TouchableOpacity } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface Notification {
   id: string;
@@ -11,7 +13,7 @@ interface Notification {
   isRead: boolean;
 }
 
-const NotificationsScreen: React.FC = () => {
+const NotificationsScreen: React.FC = ({ navigation }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
@@ -19,7 +21,7 @@ const NotificationsScreen: React.FC = () => {
   }, []);
 
   const fetchNotifications = async () => {
-    const token = await getToken()
+    const token = await getToken();
     if (!token) {
       Alert.alert('Error', 'No access token found');
       return;
@@ -32,7 +34,7 @@ const NotificationsScreen: React.FC = () => {
           'Authorization': `Bearer ${token}`,
         },
       });
-console.log(response)
+
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -50,7 +52,11 @@ console.log(response)
 
   return (
     <View style={styles.container}>
-    
+      <TouchableOpacity
+        style={{ marginBottom: 20 }}
+        onPress={() => navigation.navigate('Map')}
+      >
+      </TouchableOpacity>
       {notifications.length === 0 ? (
         <Text style={styles.noNotificationsText}>You have no new notifications</Text>
       ) : (
@@ -74,11 +80,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
   },
   noNotificationsText: {
     textAlign: 'center',

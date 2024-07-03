@@ -4,6 +4,8 @@ import { TextInput, Button, Title } from 'react-native-paper';
 import { sanitizeInput } from '../sanitize';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
 type RootStackParamList = {
   Register: undefined;
@@ -22,6 +24,28 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const registerForPushNotificationsAsync = async () => {
+    let token;
+    if (Constants.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        Alert.alert('Failed to get push token for push notification!');
+        return;
+      }
+      token = (await Notifications.getExpoPushTokenAsync({
+        projectId: 'pollution-app',  
+      })).data;
+    } else {
+      Alert.alert('Must use physical device for Push Notifications');
+    }
+    return token;
+  };
+
   const handleRegister = async () => {
     const sanitizedEmail = sanitizeInput(email);
     const sanitizedPassword = sanitizeInput(password);
@@ -36,6 +60,20 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       });
 
       if (response.ok) {
+        const data = await response.json();
+
+        const expoToken = await registerForPushNotificationsAsync();
+        if (expoToken) {
+          await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/users/expo-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${data.access_token}`,
+            },
+            body: JSON.stringify({ token: expoToken }),
+          });
+        }
+
         navigation.navigate('Confirmation');
       } else {
         const errorData = await response.json();
@@ -49,12 +87,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Title style={styles.title}>Register</Title>
-      <TextInput
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-      />
       <TextInput
         label="Email"
         value={email}
