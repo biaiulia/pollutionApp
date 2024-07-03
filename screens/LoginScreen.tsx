@@ -27,7 +27,6 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // TODO: See with notifications
   const registerForPushNotificationsAsync = async () => {
     let token;
     if (Constants.isDevice) {
@@ -148,3 +147,6 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
+
+
+
