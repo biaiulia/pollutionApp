@@ -50,7 +50,7 @@ console.log(response)
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Notifications</Text>
+    
       {notifications.length === 0 ? (
         <Text style={styles.noNotificationsText}>You have no new notifications</Text>
       ) : (
